@@ -236,7 +236,11 @@ function render() {
     paper_bgcolor: "#fff",
     plot_bgcolor:  "#fff",
     hovermode: "x unified",
-    xaxis: { showgrid: false, tickangle: -35, tickfont: { size: 11 } },
+    xaxis: {
+      showgrid: false, tickangle: -35, tickfont: { size: 11 },
+      dtick: "M12",
+      tickformat: "%Y"
+    },
     yaxis: {
       title: { text: YAXIS_LABEL[activeView], font: { size: 12 } },
       gridcolor: "#f0f0f0", tickfont: { size: 11 }
