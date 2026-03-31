@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Australian Housing Affordability</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f8f9fa; margin: 0; padding: 28px 32px; color: #222;
+  }
+  h1   { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+  .sub { font-size: 13px; color: #777; margin: 0 0 24px; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 24px;
+    margin-bottom: 20px; align-items: flex-start;
+  }
+  .ctrl-group { display: flex; flex-direction: column; gap: 7px; }
+  .ctrl-label {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: #999;
+  }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  button {
+    padding: 5px 14px; border-radius: 6px; border: 1.5px solid #d1d5db;
+    font-size: 12.5px; cursor: pointer; background: #fff; color: #555;
+    transition: all 0.15s;
+  }
+  button:hover { opacity: 0.8; }
+  button.seg-active {
+    background: #1e293b; border-color: #1e293b; color: #fff; font-weight: 600;
+  }
+  #chart {
+    background: #fff; border-radius: 10px;
+    border: 1px solid #e5e7eb; padding: 8px;
+  }
+  #loading {
+    text-align: center; padding: 80px 0;
+    font-size: 14px; color: #999;
+  }
+  .legend-note { font-size: 11px; color: #aaa; margin-top: 8px; }
+  footer {
+    margin-top: 24px; font-size: 11px; color: #bbb; border-top: 1px solid #e5e7eb;
+    padding-top: 12px;
+  }
+  footer a { color: #93c5fd; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Australian Housing Affordability</h1>
+<p class="sub">CPI-adjusted house prices vs earnings across capital cities · Source: ABS</p>
+
+<div class="controls">
+  <div class="ctrl-group">
+    <span class="ctrl-label">Cities</span>
+    <div class="btn-row" id="cityBtns"></div>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Dwelling type</span>
+    <div class="btn-row">
+      <button id="type-house"     class="seg-active" onclick="setType('house')">House</button>
+      <button id="type-attached"  onclick="setType('attached')">Attached</button>
+    </div>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">View</span>
+    <div class="btn-row">
+      <button id="view-pti"   class="seg-active" onclick="setView('pti')">Price-to-income ratio</button>
+      <button id="view-dec"   onclick="setView('dec')">Growth index (rebased 100)</button>
+      <button id="view-price" onclick="setView('price')">Real house prices</button>
+    </div>
+  </div>
+</div>
+
+<div id="chart"><div id="loading">Loading data…</div></div>
+<p class="legend-note" id="note"></p>
+
+<footer>
+  Data: ABS 6416.0 Residential Property Price Indexes, ABS 6302.0 Average Weekly Earnings · 
+  CPI-adjusted to latest quarter ·
+  <a href="https://github.com/lukas-pb/housing_affordability" target="_blank">View source on GitHub</a>
+</footer>
+
+<script>
+const COLOURS = {
+  sydney:    "#1f77b4",
+  melbourne: "#ff7f0e",
+  brisbane:  "#2ca02c",
+  adelaide:  "#d62728",
+  perth:     "#9467bd",
+  hobart:    "#8c564b",
+  darwin:    "#e377c2",
+  canberra:  "#7f7f7f"
+};
+
+const THRESHOLDS = {
+  pti: [
+    { y: 3,  color: "#22c55e", label: "3× affordable" },
+    { y: 5,  color: "#f59e0b", label: "5× moderate" },
+    { y: 10, color: "#ef4444", label: "10× severe" }
+  ],
+  dec:   [{ y: 100, color: "#94a3b8", label: "Base (100)" }],
+  price: []
+};
+
+const YAXIS_LABEL = {
+  pti:   "Price-to-income ratio (×)",
+  dec:   "Index (100 = start of series)",
+  price: "Median price (real, $M)"
+};
+
+const NOTES = {
+  pti:   "Years of gross income required to buy at median price. Affordability benchmarks shown as dotted lines.",
+  dec:   "Both series rebased to 100 at each city's earliest data point. Dotted lines = earnings growth.",
+  price: "CPI-adjusted median transfer price in today's dollars."
+};
+
+let cityData     = {};
+let activeCities = [];
+let activeType   = "house";
+let activeView   = "pti";
+
+// ── Parse CSV ────────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines  = text.trim().split("\n");
+  const header = lines[0].split(",").map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const vals = line.split(",");
+    const obj  = {};
+    header.forEach((h, i) => { obj[h] = vals[i] ? vals[i].trim() : ""; });
+    return obj;
+  });
+}
+
+// ── Prepare per-city series ──────────────────────────────────────────────────
+function prepareCity(rows) {
+  rows.sort((a, b) => a.date.localeCompare(b.date));
+
+  const dates      = rows.map(r => r.date);
+  const houseR     = rows.map(r => +r.house_price_real);
+  const attR       = rows.map(r => +r.attached_price_real);
+  const earnAnnR   = rows.map(r => +r.earnings_state_real * 52);
+  const earnAnnN   = rows.map(r => +r.earnings_state * 52);
+  const houseN     = rows.map(r => +r.house_price);
+  const attN       = rows.map(r => +r.attached_price);
+
+  const pti_house_real    = houseR.map((p, i) => +(p / earnAnnR[i]).toFixed(2));
+  const pti_attached_real = attR.map((p, i)   => +(p / earnAnnR[i]).toFixed(2));
+
+  const bH = houseR[0], bA = attR[0], bE = earnAnnR[0];
+  const idx_house    = houseR.map(v  => +(v / bH * 100).toFixed(1));
+  const idx_attached = attR.map(v    => +(v / bA * 100).toFixed(1));
+  const idx_earn     = earnAnnR.map(v => +(v / bE * 100).toFixed(1));
+
+  const price_house    = houseR.map(v => +(v / 1e6).toFixed(3));
+  const price_attached = attR.map(v   => +(v / 1e6).toFixed(3));
+
+  return { dates, pti_house_real, pti_attached_real,
+           idx_house, idx_attached, idx_earn,
+           price_house, price_attached };
+}
+
+// ── Render chart ─────────────────────────────────────────────────────────────
+function render() {
+  const traces = [];
+  const shapes = [];
+
+  activeCities.forEach(city => {
+    const d   = cityData[city];
+    const col = COLOURS[city] || "#555";
+    const lbl = city.charAt(0).toUpperCase() + city.slice(1);
+
+    if (activeView === "pti") {
+      const y = activeType === "house" ? d.pti_house_real : d.pti_attached_real;
+      traces.push({
+        x: d.dates, y,
+        name: lbl, legendgroup: city,
+        type: "scatter", mode: "lines",
+        line: { color: col, width: 2 },
+        hovertemplate: `<b>${lbl}</b><br>%{x}<br>PTI: %{y:.1f}×<extra></extra>`
+      });
+    }
+
+    if (activeView === "dec") {
+      const yP = activeType === "house" ? d.idx_house : d.idx_attached;
+      traces.push({
+        x: d.dates, y: yP,
+        name: `${lbl} — prices`, legendgroup: city,
+        type: "scatter", mode: "lines",
+        line: { color: col, width: 2 },
+        hovertemplate: `<b>${lbl} prices</b><br>%{x}<br>Index: %{y:.0f}<extra></extra>`
+      });
+      traces.push({
+        x: d.dates, y: d.idx_earn,
+        name: `${lbl} — earnings`, legendgroup: city,
+        type: "scatter", mode: "lines",
+        line: { color: col, width: 1.5, dash: "dot" },
+        opacity: 0.55,
+        hovertemplate: `<b>${lbl} earnings</b><br>%{x}<br>Index: %{y:.0f}<extra></extra>`
+      });
+    }
+
+    if (activeView === "price") {
+      const y = activeType === "house" ? d.price_house : d.price_attached;
+      traces.push({
+        x: d.dates, y,
+        name: lbl, legendgroup: city,
+        type: "scatter", mode: "lines",
+        line: { color: col, width: 2 },
+        hovertemplate: `<b>${lbl}</b><br>%{x}<br>$%{y:.2f}M<extra></extra>`
+      });
+    }
+  });
+
+  // threshold lines
+  (THRESHOLDS[activeView] || []).forEach(th => {
+    shapes.push({
+      type: "line", xref: "paper", x0: 0, x1: 1,
+      yref: "y", y0: th.y, y1: th.y,
+      line: { color: th.color, dash: "dot", width: 1.5 }
+    });
+    traces.push({
+      x: [null], y: [null], mode: "lines",
+      name: th.label, showlegend: true,
+      line: { color: th.color, dash: "dot", width: 1.5 }
+    });
+  });
+
+  const layout = {
+    shapes,
+    margin:  { t: 20, r: 20, b: 60, l: 65 },
+    height:  500,
+    paper_bgcolor: "#fff",
+    plot_bgcolor:  "#fff",
+    hovermode: "x unified",
+    xaxis: { showgrid: false, tickangle: -35, tickfont: { size: 11 } },
+    yaxis: {
+      title: { text: YAXIS_LABEL[activeView], font: { size: 12 } },
+      gridcolor: "#f0f0f0", tickfont: { size: 11 }
+    },
+    legend: { orientation: "h", y: -0.2, x: 0, font: { size: 11 } },
+    font:   { family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }
+  };
+
+  Plotly.react("chart", traces, layout, { responsive: true, displayModeBar: false });
+  document.getElementById("note").textContent = NOTES[activeView];
+}
+
+// ── City buttons ─────────────────────────────────────────────────────────────
+function buildCityBtns() {
+  const el = document.getElementById("cityBtns");
+  el.innerHTML = Object.keys(cityData).map(city => {
+    const col = COLOURS[city] || "#555";
+    const on  = activeCities.includes(city);
+    const lbl = city.charAt(0).toUpperCase() + city.slice(1);
+    return `<button id="city-${city}" onclick="toggleCity('${city}')"
+      style="${on
+        ? `background:${col};border-color:${col};color:#fff;font-weight:600`
+        : `color:${col};border-color:${col};background:#fff`}"
+    >${lbl}</button>`;
+  }).join("");
+}
+
+function toggleCity(city) {
+  if (activeCities.includes(city)) {
+    if (activeCities.length === 1) return;
+    activeCities = activeCities.filter(c => c !== city);
+  } else {
+    activeCities.push(city);
+  }
+  buildCityBtns();
+  render();
+}
+
+function setType(t) {
+  activeType = t;
+  ["house", "attached"].forEach(x => {
+    const btn = document.getElementById("type-" + x);
+    btn.classList.toggle("seg-active", x === t);
+  });
+  render();
+}
+
+function setView(v) {
+  activeView = v;
+  ["pti", "dec", "price"].forEach(x => {
+    const btn = document.getElementById("view-" + x);
+    btn.classList.toggle("seg-active", x === v);
+  });
+  render();
+}
+
+// ── Load CSV ─────────────────────────────────────────────────────────────────
+fetch("data.csv")
+  .then(r => {
+    if (!r.ok) throw new Error("Could not load data.csv");
+    return r.text();
+  })
+  .then(text => {
+    const rows = parseCSV(text);
+    const grouped = {};
+    rows.forEach(r => {
+      const city = r.city.toLowerCase().trim();
+      if (!grouped[city]) grouped[city] = [];
+      grouped[city].push(r);
+    });
+    const ORDER = ["sydney","melbourne","brisbane","adelaide","perth","hobart","darwin","canberra"];
+    ORDER.forEach(city => {
+      if (grouped[city]) cityData[city] = prepareCity(grouped[city]);
+    });
+    activeCities = Object.keys(cityData);
+    document.getElementById("loading").remove();
+    buildCityBtns();
+    render();
+  })
+  .catch(err => {
+    document.getElementById("loading").textContent =
+      "Error loading data.csv — make sure the file is in the same folder as index.html";
+    console.error(err);
+  });
+</script>
+</body>
+</html>
