@@ -37,7 +37,7 @@ After being one of the weakest performers for most of the decade, Perth's median
 *PTI = median house price ÷ annual earnings. Affordability thresholds follow Demographia methodology.*
 
 ![Real PTI](assets/pti_real.png)
-
+> ⚠️ Note: earnings are state-level averages. PTI ratios may be slightly overstated for capital city workers.
 ---
 
 ### House price vs earnings growth — rebased to 100
@@ -96,7 +96,10 @@ CPI reference is the latest date per city, so each city's series is expressed in
 ```
 PTI = median_house_price / (weekly_earnings × 52)
 ```
-Earnings are state-level averages. Capital city workers typically earn above the state average, so PTI ratios may be slightly overstated.
+⚠️ **Limitation — state-level earnings:** Earnings data (ABS 6302.0) is published at the state level, 
+not city level. Capital city workers typically earn above the state average, meaning PTI ratios in 
+this analysis are likely slightly overstated — houses appear less affordable than they truly are for 
+the average city worker. City-level earnings data is not publicly available from the ABS at this time.
 
 **Correlation analysis**
 Pearson correlation is calculated on quarter-on-quarter percentage changes rather than price levels, to avoid spurious correlation from two independently trending series.
