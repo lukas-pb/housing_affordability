@@ -12,7 +12,7 @@ Interactive analysis of house price affordability across Australia's 8 capital c
 Between 2010 and 2026, earnings grew by just 10–15% in real terms across all capital cities. Over the same period, real house prices increased by over 70% in Sydney and between 30–50% in most other capitals. The gap between the two series has widened every decade.
 
 **2. Every capital city is now severely or seriously unaffordable**
-Using the Demographia price-to-income benchmark, no Australian capital city is close to affordable. Sydney and Brisbane have crossed 10× — the threshold for "severely unaffordable" — with Sydney peaking above 14× during the 2021–22 boom. Every other capital sits between 6× and 9×. No city has been below the 5× "moderate" threshold at any point in the dataset.
+Using the Demographia price-to-income benchmark, no Australian capital city is close to affordable. Sydney and Brisbane have crossed 10× — the threshold for "severely unaffordable" — with Sydney peaking above 14× during the 2021–22 boom. Every other capital sits between 6× and 9×. No city has stayed below the 5× "moderate" threshold for more than a month or two.
 
 **3. The COVID boom and bust hit Melbourne, Hobart and Canberra hardest**
 These three cities moved in near lockstep — surging sharply through 2021 and peaking around late 2021 to early 2022, before giving back significant value. As of 2026 none have recovered to their peak in real terms, while cities like Brisbane, Adelaide and Perth continued climbing through the same period.
@@ -58,8 +58,6 @@ After being one of the weakest performers for most of the decade, Perth's median
 *Two cities with near-identical trend movements but a persistent price gap of $70k–$150k.*
 
 ![Brisbane vs Adelaide prices](assets/bris_adel_prices.png)
-
----
 
 ### Brisbane vs Adelaide — price gap over time
 *The gap has been surprisingly stable for most of the period, with notable blow-outs during the 2021–22 Brisbane surge and again in 2025–26.*
