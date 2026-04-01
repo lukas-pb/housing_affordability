@@ -188,14 +188,14 @@ function render() {
       const yP = activeType === "house" ? d.idx_house : d.idx_attached;
       traces.push({
         x: d.dates, y: yP,
-        name: `${lbl} — prices`, legendgroup: city,
+        name: `${lbl} prices`, legendgroup: city,
         type: "scatter", mode: "lines",
         line: { color: col, width: 2 },
         hovertemplate: `<b>${lbl} prices</b><br>%{x}<br>Index: %{y:.0f}<extra></extra>`
       });
       traces.push({
         x: d.dates, y: d.idx_earn,
-        name: `${lbl} — earnings`, legendgroup: city,
+        name: `${lbl} earnings`, legendgroup: city,
         type: "scatter", mode: "lines",
         line: { color: col, width: 1.5, dash: "dot" },
         opacity: 0.55,
